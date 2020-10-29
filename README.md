@@ -5,7 +5,7 @@ This is a modified version of [SwiftSwizzle](https://github.com/MarioIannotta/Sw
 
 ```swift
 do {
-    try Swizzle(ObjObject.self) { object in
+    try Swizzle(ObjcObject.self) { object in
         #selector(getter: object.selector) <-> #selector(getter: object.newSelector)
     }
 }
