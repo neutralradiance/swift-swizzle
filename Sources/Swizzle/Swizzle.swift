@@ -21,21 +21,28 @@ extension Selector {
     public static func <->(lhs: Selector, rhs: Selector) -> SwizzlePair {
         SwizzlePair(old: lhs, new: rhs)
     }
-    public static func <->(lhs: String, rhs: Selector) -> SwizzlePair {
-        SwizzlePair(old: Selector(lhs), new: rhs)
+    public static func <->(lhs: Selector, rhs: String) -> SwizzlePair {
+        SwizzlePair(old: lhs, new: Selector(rhs))
     }
     public static func <~>(lhs: Selector, rhs: Selector) -> SwizzlePair {
         SwizzlePair(old: lhs, new: rhs, static: true)
+    }
+    public static func <~>(lhs: Selector, rhs: String) -> SwizzlePair {
+        SwizzlePair(old: lhs, new: Selector(rhs), static: true)
+    }
+}
+extension String {
+    public static func <->(lhs: String, rhs: Selector) -> SwizzlePair {
+        SwizzlePair(old: Selector(lhs), new: rhs)
     }
     public static func <~>(lhs: String, rhs: Selector) -> SwizzlePair {
         SwizzlePair(old: Selector(lhs), new: rhs, static: true)
     }
 }
-
 public struct Swizzle {
 
     @_functionBuilder
-    public struct SwizzleBuilder {
+    public struct Builder {
         
         public static func buildBlock(_ swizzlePairs: SwizzlePair...) -> [SwizzlePair] {
             Array(swizzlePairs)
@@ -43,14 +50,14 @@ public struct Swizzle {
     }
     
     @discardableResult
-    public init<T>(_ type: T.Type, @SwizzleBuilder _ makeSwizzlePairs: (T.Type) -> [SwizzlePair]) throws where T: AnyObject {
+    public init<T>(_ type: T.Type, @Builder _ makeSwizzlePairs: (T.Type) -> [SwizzlePair]) throws where T: AnyObject {
         guard object_isClass(type) else { throw Error.missingClass(String(describing: type)) }
         let swizzlePairs = makeSwizzlePairs(type)
         try swizzle(type: type, pairs: swizzlePairs)
     }
 
     @discardableResult
-    public init(_ string: String, @SwizzleBuilder _ makeSwizzlePairs: () -> [SwizzlePair]) throws {
+    public init(_ string: String, @Builder _ makeSwizzlePairs: () -> [SwizzlePair]) throws {
         guard let type = NSClassFromString(string) else { throw Error.missingClass(string) }
         let swizzlePairs = makeSwizzlePairs()
         try swizzle(type: type, pairs: swizzlePairs)
@@ -81,25 +88,77 @@ extension Swizzle {
     enum Error: LocalizedError {
         case missingClass(_ name: String), missingMethod(SwizzlePair)
 
-        static let prefix: String = "SwizzleError: "
+        static let prefix: String = "Swizzle.Error: "
 
         var failureReason: String? {
             switch self {
-            case let .missingClass(type):
-                return "Missing class: \(type)"
-            case let .missingMethod(pair):
-                return "Missing method for: \(pair.old) and/or \(pair.new)"
+                case let .missingClass(type):
+                    return "Missing class: \(type)"
+                case let .missingMethod(pair):
+                    return "Missing method for: \(pair.old) and/or \(pair.new)"
             }
         }
         
         var errorDescription: String? {
             switch self {
-            case .missingClass:
-                return Self.prefix.appending(failureReason!)
-            case .missingMethod:
-                return Self.prefix.appending(failureReason!)
+                case .missingClass:
+                    return Self.prefix.appending(failureReason!)
+                case .missingMethod:
+                    return Self.prefix.appending(failureReason!)
             }
         }
     }
 }
 
+#if canImport(SwiftUI)
+import SwiftUI
+
+extension View {
+    @ViewBuilder public func swizzle<T>(shouldSwizzle: Binding<Bool>,
+                           onDismiss: (() -> Void)? = nil,
+                           class: T.Type,
+                           @Swizzle.Builder
+                           perform: @escaping (T.Type) -> [SwizzlePair]) -> some View where T: AnyObject {
+        let attempt = {
+            DispatchQueue.main.async {
+                do {
+                    print("attempting to swizzle")
+                    try Swizzle(`class`, perform)
+                    print("done swizzling")
+                    shouldSwizzle.wrappedValue = false
+                } catch {
+                    print(error.localizedDescription)
+                }
+            }
+        }
+        if #available(iOS 14.0, *) {
+            self
+                .onAppear {
+                    if shouldSwizzle.wrappedValue {
+                        attempt()
+                    }
+                }
+                .onChange(of: shouldSwizzle.wrappedValue) { swizzle in
+                    if swizzle {
+                        attempt()
+                    }
+                }
+                .onDisappear(perform: onDismiss)
+                //.erased()
+        } else {
+             self
+                .onAppear {
+                    if shouldSwizzle.wrappedValue {
+                        attempt()
+                    }
+                }
+                .onDisappear(perform: onDismiss)
+                //.erased()
+        }
+    }
+    private func erased() -> AnyView {
+        AnyView(self)
+    }
+}
+
+#endif
