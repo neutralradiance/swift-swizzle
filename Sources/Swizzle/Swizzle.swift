@@ -122,9 +122,7 @@ extension View {
         let attempt = {
             DispatchQueue.main.async {
                 do {
-                    print("attempting to swizzle")
                     try Swizzle(`class`, perform)
-                    print("done swizzling")
                     shouldSwizzle.wrappedValue = false
                 } catch {
                     print(error.localizedDescription)
@@ -132,8 +130,7 @@ extension View {
             }
         }
         if #available(iOS 14.0, *) {
-            self
-                .onAppear {
+                onAppear {
                     if shouldSwizzle.wrappedValue {
                         attempt()
                     }
@@ -144,20 +141,14 @@ extension View {
                     }
                 }
                 .onDisappear(perform: onDismiss)
-                //.erased()
         } else {
-             self
-                .onAppear {
+                onAppear {
                     if shouldSwizzle.wrappedValue {
                         attempt()
                     }
                 }
                 .onDisappear(perform: onDismiss)
-                //.erased()
         }
-    }
-    private func erased() -> AnyView {
-        AnyView(self)
     }
 }
 
