@@ -149,7 +149,7 @@ extension Swizzle {
 #if canImport(SwiftUI)
 	import SwiftUI
 
-@available(macOS 11.0, iOS 13.0, *)
+	@available(macOS 11.0, iOS 13.0, *)
 	public extension View {
 		@ViewBuilder func swizzle<T>(
 			shouldSwizzle: Binding<Bool>,
@@ -163,7 +163,7 @@ extension Swizzle {
 						try Swizzle(`class`, perform)
 						shouldSwizzle.wrappedValue = false
 					} catch {
-						print(error.localizedDescription)
+						debugPrint(error.localizedDescription)
 					}
 				}
 			}
@@ -191,5 +191,4 @@ extension Swizzle {
 			}
 		}
 	}
-
 #endif
